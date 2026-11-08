@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Budspill</title>
+<style>
+*{box-sizing:border-box}body{font-family:Arial,sans-serif;background:#eef4ee;margin:0;padding:16px;color:#172017}
+.wrap{max-width:900px;margin:auto}.hidden{display:none!important}
+h1{text-align:center}.players{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+.player{background:#fff;border-radius:14px;padding:14px 28px;text-align:center;min-width:180px;box-shadow:0 2px 10px #0001}
+.player b{font-size:22px}.money{font-size:28px;font-weight:bold;margin-top:5px}
+.box,.card{background:#fff;padding:20px;border-radius:16px;margin:18px 0;box-shadow:0 2px 10px #0001;text-align:center}
+input,select{padding:11px;border:1px solid #aaa;border-radius:8px;font-size:17px}
+.catinput{width:min(450px,90%)}button{padding:11px 16px;border:0;border-radius:9px;font-size:16px;font-weight:bold;cursor:pointer;margin:5px}
+.dark{background:#222;color:#fff}.gold{background:#e3a800}.green{background:#238443;color:#fff}.gray{background:#777;color:#fff}
+.item{font-size:30px;font-weight:bold;margin:14px}.cat{color:#667}.line{display:flex;justify-content:center;align-items:center;gap:7px;flex-wrap:wrap}
+.status{font-weight:bold;margin:15px}.results{display:grid;grid-template-columns:1fr 1fr;gap:15px}
+.result{background:#f5faf5;border-radius:12px;padding:15px;text-align:left}.result h2{text-align:center}
+.result li{margin:8px 0}.winner{font-weight:bold}
+table{width:100%;border-collapse:collapse;background:#fff;margin-top:18px}th,td{padding:9px;border-bottom:1px solid #ddd;text-align:left}
+@media(max-width:600px){.results{grid-template-columns:1fr}}
+.result-ai-image{width:100%;max-width:520px;aspect-ratio:4/3;object-fit:cover;border-radius:18px;display:block;margin:10px auto 18px;box-shadow:0 8px 24px rgba(0,0,0,.18);background:#eee}</style>
+</head>
+<body>
+<div class="wrap">
+<h1>🎲 BUDSPILL</h1>
+
+<section id="setup" class="box">
+  <h2>Velg kategori</h2>
+  <input id="categoryInput" class="catinput" placeholder="F.eks. Hage, Fotballag, Island, Kake...">
+  <br>
+  <button class="dark" onclick="startTyped()">Start denne kategorien</button>
+  <button class="gold" onclick="startRandom()">🎲 Tilfeldig kategori</button>
+  <p>Én kategori varer gjennom hele runden. Hver person skal få 5 ting.</p>
+</section>
+
+<section id="game" class="hidden">
+  <div class="players">
+    <div class="player"><b>Ibrahim</b><div class="money">$<span id="mI">20.00</span></div><div id="cI">0/5 ting</div></div>
+    <div class="player"><b>Aliha</b><div class="money">$<span id="mA">20.00</span></div><div id="cA">0/5 ting</div></div>
+  </div>
+
+  <div class="card">
+    <div class="cat" id="cat"></div>
+    <div class="item" id="item"></div>
+    <div class="line">
+      <span>Bud:</span><input id="bid" type="number" min="-20" step="0.01" placeholder="$">
+      <span>Kjøper:</span>
+      <select id="buyer"><option>Ibrahim</option><option>Aliha</option></select>
+      <button class="green" onclick="buy()">Kjøp</button>
+      <button class="gray" onclick="skip()">Ingen kjøpte</button>
+    </div>
+    <div class="status" id="status">Ibrahim: 0/5 · Aliha: 0/5</div>
+    <button class="gold" onclick="nextItem()">Neste ting ➡️</button>
+  </div>
+
+  <table><thead><tr><th>#</th><th>Ting</th><th>Bud</th><th>Kjøper</th></tr></thead>
+  <tbody id="history"></tbody></table>
+</section>
+
+<section id="results" class="hidden box">
+  <h1>🏆 Runden er ferdig!</h1>
+  <p id="resultCategory" style="text-align:center;font-size:20px"></p>
+  <div class="results">
+    <div class="result"><h2>Ibrahim</h2><img id="ibAIImage" class="result-ai-image" alt="AI-bilde av det Ibrahim fikk"><ol id="ibItems"></ol></div>
+    <div class="result"><h2>Aliha</h2><img id="aliAIImage" class="result-ai-image" alt="AI-bilde av det Aliha fikk"><ol id="aliItems"></ol></div>
+  </div>
+  <div style="text-align:center">
+    <button class="gold" onclick="newRound()">➡️ Videre – velg ny kategori</button>
+  </div>
+</section>
+</div>
+
+<script>
+const builtIn={
+"Fast Food":["🍔 McDonald's","🍔 Burger King","🍗 KFC","🥪 Subway","🍔 Wendy's","🍔 Five Guys","🍔 Shake Shack","🍗 Popeyes","🌮 Taco Bell","🍔 Jollibee","🍔 MOS Burger","🍕 Domino's","🍕 Pizza Hut","🍗 Chick-fil-A","🍔 In-N-Out","🌯 Chipotle","🍔 Whataburger","🍗 Nando's","🍔 Carl's Jr.","🥙 El Pollo Loco","🍔 Hardee's","🍗 Raising Cane's","🍔 Jack in the Box","🍔 Dairy Queen","🍕 Little Caesars","🍔 Sonic","🍗 Texas Chicken","🥙 shawarma-kjede","🍔 lokal burgerkjede"],
+"Meal":["🍟 McDonald's Fries","🍔 McDonald's Big Mac","🍗 McDonald's McNuggets","🍦 McDonald's McFlurry","🥤 McDonald's Coca-Cola","🍔 Burger King Whopper","🥬 Burger King Veggie Burger","🍟 Burger King Fries","🍗 KFC Chicken Bucket","🌯 KFC Twister","🥤 KFC Pepsi","🥪 Subway B.M.T.","🍪 Subway Cookie","🌮 Taco Bell Crunchy Taco","🌯 Taco Bell Burrito","🍗 Popeyes Chicken Sandwich","🍔 Five Guys Cheeseburger","🍟 Five Guys Fries","🍔 Jollibee Yumburger","🍟 Jollibee Fries","🍕 Domino's Pepperoni Pizza","🍕 Pizza Hut Pan Pizza","🍗 Chick-fil-A Chicken Sandwich","🍟 Chick-fil-A Waffle Fries","🍔 In-N-Out Double-Double","🌯 Chipotle Chicken Burrito","🍗 Nando's Peri-Peri Chicken","🥙 Turkish döner kebab","🌯 Mexican burrito","🍕 kald pizza","🍟 kalde fries","🥤 lunken brus","🍔 tørr burger","🍗 overstekt kylling","🍦 smeltet dessert"],
+"Vending Machine":["💧 Twin vann","🔴 Red Bull","🥤 Coca-Cola","🥤 Pepsi","⚡ Monster Energy","💧 Farris","🧃 Juice","🍫 Snickers","🍫 KitKat","🍫 Twix","🍬 Skittles","🍪 Oreo","🥔 Pringles","🍫 Kinder Bueno","🍬 Mentos","🥤 Sprite","🥤 Fanta","🍫 Mars","🍫 Bounty","🥜 Peanøtter","🧃 Tran","🧃 Tran-shot","🥤 Lunken juice","🥤 Gammel brus","🍫 Smeltet sjokolade","🍪 Knust kjeks","🥤 Halvtom flaske","🍬 Seige Mentos","🥔 Knuste chips","📦 Tom snackspakke"],
+"Snacks":["🍫 Snickers","🍫 KitKat","🍫 Twix","🍫 Kinder Bueno","🍫 Mars","🍫 Bounty","🍪 Oreo","🍿 Popcorn","🥔 Pringles","🥔 Doritos","🥔 Lay’s","🍬 Skittles","🍬 M&M’s","🍬 Mentos","🍭 Chupa Chups","🥜 Peanøtter","🍪 Digestive","🍫 Freia Melkesjokolade","🍫 Kvikk Lunsj","🍫 Smash","🍿 Popcorn uten salt","🍪 Gammel kjeks","🍫 Smeltet sjokolade","🥔 Myke chips","🍬 Smeltede godterier","🍪 Knust Oreo","🥜 Brente peanøtter","🍭 Gammel kjærlighet på pinne"],
+"Øy":["🏖️ Strand","🛝 Lekeplass","🏡 Villa","🏊 Basseng","🚤 Privat båt","🍹 Strandbar","🏄 Surfeskole","🐠 Korallrev","🏨 Luksushotell","⛵ Seilbåt","🌊 Vannsportpark","🌅 Utsiktspunkt","🛥️ Yacht","🌴 Palmestrand","🎡 Fornøyelsespark","🌳 Ødelagt tre","🏚️ Falleferdig hytte","🪵 Ødelagt brygge","🗑️ Søppelstrand","🚧 Stengt strand","🛶 Lekk kano","🌊 Ødelagt vannsklie","🏖️ Skitten strand","🌴 Visne palmer"],
+"Øyer":["🏖️ Strand","🛝 Lekeplass","🏡 Villa","🏊 Basseng","🚤 Privat båt","🍹 Strandbar","🏄 Surfeskole","🐠 Korallrev","🏨 Luksushotell","⛵ Seilbåt","🌊 Vannsportpark","🌅 Utsiktspunkt","🛥️ Yacht","🌴 Palmestrand","🎡 Fornøyelsespark","🌳 Ødelagt tre","🏚️ Falleferdig hytte","🪵 Ødelagt brygge","🗑️ Søppelstrand","🛶 Lekk kano"],
+"Klær":["👟 Hvit Lacoste-sko","👕 Hvit Lacoste-skjorte","👖 Blå Levi’s-jeans","👚 Svart Nike Tech-genser","🧥 Svart The North Face-jakke","👕 Hvit Ralph Lauren-pique","👖 Svart Levi’s-jeans","👟 Hvit Air Jordan 1","🧢 New Era-caps","👕 Adidas Originals-genser","👕 Hullete T-skjorte","👟 Utslitte sko","👖 Bukse med hull","🧦 Enslig sokk","🧥 Ødelagt jakke","👕 Flekkete skjorte","🩳 Altfor stor shorts","🧢 Gammel caps"],
+"Bilmerker":["🚗 BMW","🚗 Mercedes-Benz","🚗 Audi","🚗 Porsche","🚗 Toyota","🚗 Volkswagen","🚗 Ferrari","🚗 Lamborghini","🚗 Tesla","🚗 Ford","🚗 Lada","🚗 gammel ukjent bil","🚗 rustent bilmerke","🚗 billig ukjent merke","🚗 merke med ødelagt logo"],
+"Biler":["🚗 BMW M3","🚗 Mercedes-AMG GT","🚗 Audi RS6","🚗 Porsche 911","🚗 Toyota Supra","🚗 Ford Mustang","🚗 Nissan GT-R","🚗 Tesla Model S","🚗 Lamborghini Huracán","🚗 Ferrari 488","🚗 Rusten gammel bil","🚗 Bil med ødelagt motor","🚗 Bil med punktert dekk","🚗 Skitten varebil","🚗 Gammel bil uten radio"],
+"Fotballspillere":["⚽ Erling Haaland","⚽ Kylian Mbappé","⚽ Vinícius Júnior","⚽ Jude Bellingham","⚽ Lionel Messi","⚽ Cristiano Ronaldo","⚽ Ronaldinho","⚽ Pelé","⚽ Diego Maradona","⚽ Zinedine Zidane","⚽ dårlig amatørspiller","⚽ spiller med vondt kne","⚽ benkesliter","⚽ ukjent lokalspiller","⚽ spiller som aldri møter på trening"],
+"Fotballag":["⚽ Real Madrid","⚽ Barcelona","⚽ Liverpool","⚽ Arsenal","⚽ Manchester City","⚽ Bayern München","⚽ PSG","⚽ Chelsea","⚽ Inter Milan","⚽ Manchester United","⚽ bunnlag","⚽ amatørklubb","⚽ lag uten keeper","⚽ lag med bare fem spillere","⚽ lag som taper hver kamp"],
+"Sko":["👟 Nike Air Force 1","👟 Adidas Samba","👟 New Balance 550","👟 Air Jordan 1","👟 Nike Dunk Low","👟 Adidas Campus 00s","👟 New Balance 9060","👟 Nike Air Max 95","👟 Adidas Ultraboost","👟 Converse Chuck Taylor","👟 Hullete joggesko","👟 Våt sokk i skoen","👟 Utslitte joggesko","👟 For små sko","👟 Sko med løs såle"],
+"Gaming":["🎮 PlayStation 5","🎮 Xbox Series X","🎮 Nintendo Switch","🎧 SteelSeries-headset","🖥️ Gaming-PC","🪑 Gamingstol","⌨️ Gamingtastatur","🖱️ Gamingmus","🎙️ Gamingmikrofon","🎮 DualSense-kontroller","🎮 Gammel konsoll","⌨️ Tastatur med manglende taster","🖱️ Mus som hakker","🎧 Ødelagt headset","🖥️ PC som overopphetes"],
+"Spill":["🎮 Minecraft","🎮 Roblox","🎮 Fortnite","🎮 EA Sports FC","🎮 GTA V","🎮 Rocket League","🎮 Call of Duty","🎮 FIFA","🎮 Among Us","🎮 Brawl Stars","🎮 Mario Kart","🎮 Pokémon","🎮 Dårlig mobilspill","🎮 Spill som krasjer hele tiden","🎮 Gammelt spill ingen liker","🎮 Spill med masse reklame"],
+"Gamingsett":["🖥️ Svart bord","🎮 PlayStation 5","🪑 Svart gamingstol","🖥️ Gaming-PC","⌨️ Gamingtastatur","🖱️ Gamingmus","🎧 Gaming-headset","🎙️ Gamingmikrofon","💡 RGB-lys","🖥️ Gamingskjerm","🪑 Puff som stol","🪑 Plaststol","🖥️ Gammel liten skjerm","⌨️ Gammelt tastatur","🖱️ Mus med ødelagt knapp","💡 Én svak lampe","🪑 Knirkete stol","🖥️ PC som lagger"],
+"Hage":["🏀 Basketballbane","⛳ Golfbane","🔥 Bålplass","🏊 Stort basseng","⚽ Fotballbane","🎾 Tennisbane","🏐 Volleyballbane","🛹 Skatepark","🧗 Klatrevegg","💦 Vannsklie","🏹 Bueskytebane","🏕️ Luksuriøs grillplass","🏖️ Sandstrand i hagen","🌴 Palmedel","🛝 Stor lekeplass","🌳 Trehytte","💡 Kule hagelys","🎯 Dartbane","🥅 Fotballmål","🏓 Bordtennisbord","🌳 Ødelagt tre","🥀 Visne blomster","🪑 Ødelagt hagemøbel","🗑️ Overfylt søppelkasse","🕳️ Stort hull i plenen","🌿 Overgrodd ugress","🧱 Ødelagt mur","💡 Ødelagte hagelys","🪵 Råttent treverk","🐌 Snegleinvasjon","🔥 Grill som ikke virker","🛝 Ødelagt skli","🌱 Tørt gress","🪴 Død plante","🏚️ Falleferdig hagebod","💧 Lekker vannslange"],
+"Hus":["📺 65-tommers TV","🛋️ Hjørnesofa","🛏️ King-size seng","💡 LED-lampe","🧊 Samsung-kjøleskap","🚿 Regndusj","🍳 Airfryer","🪴 Stor stueplante","🧹 Dyson-støvsuger","🪑 Spisebord","🪑 Ødelagt stol","📺 Gammel TV","🛏️ Hullete madrass","🚿 Dusj som lekker","🧊 Gammelt kjøleskap","💡 Pære som blinker","🧹 Ødelagt støvsuger","🚪 Dør som knirker"],
+"Island":[
+"💎 Krystallklart vann rundt øya","🏖️ Strand","🏡 Stor luksusvilla","🎢 Karusell","✈️ Privat jetvei","🛥️ Privat marina","🏖️ Privat strand","🏊 Infinity-basseng","🌋 Fantastisk vulkanutsikt","🏨 Luksushotell","🎡 Stor fornøyelsespark","🚁 Helikopterlandingsplass","🏎️ Privat racerbane","💦 Gigantisk vannpark","🌴 Tropisk palmeområde","⛳ Golfbane","🎠 Fornøyelsespark","🐬 Delfinlagune","🛥️ Luksusyacht","🏰 Stor øyfestning","🌉 Stor bro","🌊 Klar lagune","🏕️ Luksuscamping","🎆 Fyrverkeriplass","🍹 Strandbar","🗿 Stor statue","🔴 Skittent vann","🏚️ Falleferdig hus","🪨 Masse stein overalt","🌪️ Konstant sterk vind","🗑️ Søppel på stranden","🌊 Oversvømt område","🦟 Masse insekter","🪵 Ødelagt brygge","🌫️ Konstant tåke","🥀 Visne planter","🚧 Ødelagt vei","🏚️ Gammel hytte","🌊 Lekkende båt","🗑️ Forurenset strand","💡 Ødelagte lys","🌳 Veltede trær"
+],
+"Mat":["🍕 Pepperonipizza","🍔 Cheeseburger","🍣 Sushi","🌮 Taco","🍝 Spaghetti Bolognese","🍗 Kyllingburger","🥩 Biff","🍜 Ramen","🥞 Amerikanske pannekaker","🍦 Vaniljeis","🥣 Kald suppe","🍞 Brent brød","🍕 Kald pizza","🍚 Overkokt ris","🥩 Seig biff","🍳 Brent egg","🥗 Slapp salat","🍝 Overkokt pasta"],
+"Dyr":["🦁 Løve","🐯 Tiger","🐘 Elefant","🦒 Sjiraff","🐼 Panda","🐺 Ulv","🦊 Rev","🐬 Delfin","🦈 Hvithai","🦅 Ørn","🐔 Våt høne","🐟 Gammel fisk","🐌 Snegle","🦟 Mygg","🐀 Rotte","🐐 Sur geit","🦃 Bråkete kalkun"],
+"Filmer":["🎬 Avengers: Endgame","🎬 Avatar","🎬 Titanic","🎬 The Dark Knight","🎬 Spider-Man: No Way Home","🎬 Harry Potter","🎬 The Lion King","🎬 Jurassic Park","🎬 Top Gun: Maverick","🎬 Toy Story","🎬 Kjempedårlig amatørfilm","🎬 Film med dårlig lyd","🎬 Film som stopper hele tiden","🎬 Kjedelig dokumentar","🎬 Gammel film ingen husker"],
+"Sport":["⚽ Fotball","🏀 Basketball","🎾 Tennis","🏎️ Formel 1","🥊 Boksing","🏒 Ishockey","🏊 Svømming","🏐 Volleyball","🏌️ Golf","⛷️ Alpint","🥴 Dårlig treningssykkel","🏀 Hull i basketballkurv","⚽ Flat fotball","🎾 Ødelagt tennisracket","🏊 Gammelt svømmebrett","🥊 Ødelagt boksehanske"]
+};
+
+const randomCats=["Fast Food","Meal","Hage","Kake","Vending Machine","Fotballag","Island","Hus","Gaming","Gamingsett","Biler","Dyr","Mat","Filmer","Spill","Klær","Sport","Land","Byer","Musikk","Fly","Leker","Teknologi","Skole","Strand","Fest"];
+
+let category="", pool=[], current="", handled=false, round=0;
+let money={Ibrahim:20,Aliha:20}, count={Ibrahim:0,Aliha:0}, owned={Ibrahim:[],Aliha:[]};
+
+function makePool(cat){
+ let key=Object.keys(builtIn).find(k=>k.toLowerCase().trim()===cat.toLowerCase().trim());
+ if(key) return [...builtIn[key]];
+ return [
+  "📦 Konkret ting i "+cat,
+  "🏆 Førstevalg i "+cat,
+  "🎯 Neste ting i "+cat,
+  "⭐ Et valg fra "+cat,
+  "🎁 Ting fra "+cat,
+  "🚀 Ny ting i "+cat,
+  "💎 Spesiell ting i "+cat,
+  "🔥 Populær ting i "+cat,
+  "👑 Kjent ting i "+cat,
+  "✨ Siste ting i "+cat
+ ];
+}
+function startTyped(){
+ let v=document.getElementById("categoryInput").value.trim();
+ if(!v){alert("Skriv en kategori først.");return}
+ startRound(v);
+}
+function startRandom(){
+ let c=randomCats[Math.floor(Math.random()*randomCats.length)];
+ startRound(c);
+}
+function startRound(c){
+ category=c; pool=makePool(c);
+ money={Ibrahim:20,Aliha:20};count={Ibrahim:0,Aliha:0};owned={Ibrahim:[],Aliha:[]};
+ round=0;handled=false;
+ document.getElementById("setup").classList.add("hidden");
+ document.getElementById("results").classList.add("hidden");
+ document.getElementById("game").classList.remove("hidden");
+ document.getElementById("history").innerHTML="";
+ update();
+ showItem();
+}
+function showItem(){
+ if(pool.length===0) pool=makePool(category);
+ let i=Math.floor(Math.random()*pool.length);
+ current=pool.splice(i,1)[0];
+ handled=false;
+ document.getElementById("cat").textContent="Kategori: "+category;
+ document.getElementById("item").textContent=current;
+ document.getElementById("bid").value="";
+}
+function update(){
+ document.getElementById("mI").textContent=money.Ibrahim.toFixed(2);document.getElementById("mA").textContent=money.Aliha.toFixed(2);
+ document.getElementById("cI").textContent=count.Ibrahim+"/5 ting";document.getElementById("cA").textContent=count.Aliha+"/5 ting";
+ document.getElementById("status").textContent="Ibrahim: "+count.Ibrahim+"/5 · Aliha: "+count.Aliha+"/5";
+}
+function buy(){
+ if(handled)return alert("Denne tingen er allerede behandlet.");
+ let p=Number(document.getElementById("bid").value),who=document.getElementById("buyer").value;
+ if(!Number.isFinite(p))return alert("Skriv inn et gyldig bud.");
+ let other=who==="Ibrahim"?"Aliha":"Ibrahim";
+ if(p<0){
+   let amount=Math.abs(p);
+   if(count[other]>=5)return alert(other+" har allerede fått 5 ting.");
+   if(amount>money[who])return alert(who+" har ikke nok penger til dette negative budet.");
+   money[who]-=amount;
+   money[other]+=amount;
+   count[other]++;
+   owned[other].push(current+" — $"+p.toFixed(2));
+   handled=true;round++;
+   addRow(p,other);update();checkFinish();
+   return;
+ }
+ if(count[who]>=5)return alert(who+" har allerede fått 5 ting.");
+ if(p>money[who])return alert(who+" har ikke nok penger.");
+ money[who]-=p;count[who]++;owned[who].push(current+" — $"+p.toFixed(2));
+ handled=true;round++;
+ addRow(p,who);update();checkFinish();
+}
+function skip(){
+ if(handled)return alert("Denne tingen er allerede behandlet.");
+ handled=true;round++;addRow(null,"Ingen kjøpte");checkFinish();
+}
+function addRow(p,who){
+ let tr=document.createElement("tr");
+ tr.innerHTML="<td>"+round+"</td><td>"+current+"</td><td>"+(p===null?"—":"$"+p.toFixed(2))+"</td><td>"+who+"</td>";
+ document.getElementById("history").appendChild(tr);
+}
+function nextItem(){
+ if(!handled)return alert("Trykk «Kjøp» eller «Ingen kjøpte» først.");
+ if(count.Ibrahim===5&&count.Aliha===5){finish();return}
+ showItem();
+}
+function checkFinish(){
+ if(count.Ibrahim===5&&count.Aliha===5) finish();
+}
+function finish(){
+ document.getElementById("game").classList.add("hidden");
+ document.getElementById("results").classList.remove("hidden");
+ document.getElementById("resultCategory").textContent="Kategori: "+category;
+ document.getElementById("ibItems").innerHTML=owned.Ibrahim.map(x=>"<li class='winner'>"+x+"</li>").join("");
+ document.getElementById("aliItems").innerHTML=owned.Aliha.map(x=>"<li class='winner'>"+x+"</li>").join("");
+ setResultAIImage("ibAIImage","Ibrahim");
+ setResultAIImage("aliAIImage","Aliha");
+}
+function setResultAIImage(id,player){
+ const items=owned[player].map(x=>x.replace(/^[^\p{L}\p{N}]+/u,"").replace(/\s+—\s+\$-?\d+(?:\.\d+)?$/,""));
+ let scene;
+ if(category.toLowerCase().includes("vending")){
+   scene="a realistic modern vending machine, glass front, filled with the exact products: "+items.join(", ")+", all five products clearly visible inside the same machine";
+ }else if(category.toLowerCase()==="meal"||category.toLowerCase().includes("fast food meal")){
+   scene="a realistic complete fast food meal arranged together on a table, showing the exact items: "+items.join(", ");
+ }else{
+   scene="a realistic display scene showing the exact five items together: "+items.join(", ")+", arranged naturally as a collection";
+ }
+ const prompt="Photorealistic AI image for a game, "+scene+", high detail, accurate recognizable products, no text labels, no people, clean composition, landscape 4:3";
+ const url="https://image.pollinations.ai/prompt/"+encodeURIComponent(prompt)+"?width=800&height=600&nologo=true";
+ const img=document.getElementById(id); img.src=url;
+}
+function newRound(){
+ document.getElementById("results").classList.add("hidden");
+ document.getElementById("setup").classList.remove("hidden");
+ document.getElementById("categoryInput").value="";
+}
+</script>
+</body>
+</html>
